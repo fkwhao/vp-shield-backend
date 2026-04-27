@@ -457,6 +457,82 @@ public class ShieldController {
         return ApiResponse.success(status);
     }
 
+    // ==================== 紧急防御 ====================
+
+    /**
+     * 获取紧急防御状态
+     * GET /api/v1/emergency/status
+     */
+    @GetMapping("/emergency/status")
+    public ApiResponse<Map<String, Object>> getEmergencyStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("emergencyModeActive", defenseMonitor.isEmergencyModeActive());
+        status.put("emergencyReason", defenseMonitor.getEmergencyReason());
+        status.put("snifferEmergencyMode", snifferService.isEmergencyMode());
+        status.put("currentFilter", snifferService.getCurrentFilter());
+        status.put("config", Map.of(
+                "enabled", shieldProperties.getDefense().isEmergencyDefense(),
+                "sourceIpThreshold", shieldProperties.getDefense().getEmergencySourceIpThreshold(),
+                "ppsThreshold", shieldProperties.getDefense().getEmergencyPpsThreshold(),
+                "stopCapture", shieldProperties.getDefense().isEmergencyStopCapture(),
+                "recoverySeconds", shieldProperties.getDefense().getEmergencyRecoverySeconds()
+        ));
+        return ApiResponse.success(status);
+    }
+
+    /**
+     * 手动触发紧急防御
+     * POST /api/v1/emergency/trigger
+     */
+    @PostMapping("/emergency/trigger")
+    public ApiResponse<String> triggerEmergency(@RequestBody(required = false) Map<String, String> request) {
+        String mode = request != null ? request.getOrDefault("mode", "established-only") : "established-only";
+
+        log.warn("手动触发紧急防御模式: {}", mode);
+
+        boolean success = snifferService.enterEmergencyMode(mode);
+
+        if (success) {
+            return ApiResponse.success("紧急防御模式已激活: " + mode);
+        } else {
+            return ApiResponse.error("紧急防御激活失败");
+        }
+    }
+
+    /**
+     * 退出紧急防御模式
+     * POST /api/v1/emergency/recover
+     */
+    @PostMapping("/emergency/recover")
+    public ApiResponse<String> recoverFromEmergency() {
+        log.info("手动退出紧急防御模式");
+        defenseMonitor.exitEmergencyMode();
+
+        return ApiResponse.success("已退出紧急防御模式，恢复正常运行");
+    }
+
+    /**
+     * 动态设置抓包过滤器
+     * PUT /api/v1/capture/filter
+     */
+    @PutMapping("/capture/filter")
+    public ApiResponse<String> setCaptureFilter(@RequestBody Map<String, String> request) {
+        String filter = request.get("filter");
+        if (filter == null || filter.isBlank()) {
+            return ApiResponse.error("过滤器不能为空");
+        }
+
+        if (!snifferService.isCapturing()) {
+            return ApiResponse.error("抓包未运行");
+        }
+
+        log.info("动态设置BPF过滤器: {}", filter);
+        // 通过紧急模式接口设置过滤器
+        snifferService.enterEmergencyMode(filter.equals("ip") ? "none" : "custom");
+
+        return ApiResponse.success("过滤器已更新: " + filter);
+    }
+
     /**
      * 健康检查
      * GET /api/v1/health

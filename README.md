@@ -51,6 +51,20 @@ SYN/UDP/ICMP → 各协议独立限速阈值
 防止告警风暴，避免重复处理已封禁IP
 ```
 
+**紧急防御** — 大规模DDoS攻击
+```
+检测到大量不同源IP 或 极高PPS → 动态切换BPF过滤器
+过滤攻击协议，只保留正常流量 → 自动/手动恢复
+```
+
+| 模式 | 效果 | 适用场景 |
+|-----|-----|---------|
+| `established-only` | 只保留已建立TCP连接 | 通用DDoS防护 |
+| `drop-udp` | 过滤UDP流量 | UDP Flood |
+| `drop-syn` | 过滤SYN包 | SYN Flood |
+| `drop-icmp` | 过滤ICMP | ICMP Flood |
+| `stop` | 完全停止抓包 | 极端情况 |
+
 ---
 
 ## 技术栈
@@ -117,6 +131,13 @@ GET  /api/v1/ratelimit/status     状态
 POST /api/v1/ratelimit/disable    禁用(恢复)
 ```
 
+### 紧急防御
+```
+GET  /api/v1/emergency/status     紧急防御状态
+POST /api/v1/emergency/trigger    手动触发紧急防御
+POST /api/v1/emergency/recover    退出紧急防御模式
+```
+
 ### 统计
 ```
 GET /api/v1/stats/current         实时统计
@@ -146,6 +167,12 @@ vpshield:
     rate-limit: true              # 限速开关
     auto-block-window-seconds: 30 # 封禁窗口
     auto-block-attack-threshold: 3# 封禁阈值
+    # 紧急防御配置
+    emergency-defense: true       # 紧急防御开关
+    emergency-source-ip-threshold: 5   # 触发阈值:源IP数量
+    emergency-pps-threshold: 10000     # 触发阈值:PPS
+    emergency-stop-capture: false      # 是否停止抓包
+    emergency-recovery-seconds: 120    # 自动恢复时间
 ```
 
 ---
@@ -184,6 +211,7 @@ com.ethan.vpshield
 |---------|------------|------------|-----|
 | 真实IP (内网) | `true` | `false` | 精准封禁攻击源 |
 | 伪造IP (外网DDoS) | `false` | `true` | 限速保护服务 |
+| 大规模DDoS | 启用 `emergency-defense` | - | 动态过滤攻击协议 |
 
 ---
 
@@ -212,6 +240,7 @@ hping3 -1 --flood <broadcast> -a <victim_ip>
 - Linux 使用 `iptables`
 - 封禁规则命名格式: `VP-Shield-Block-{ip}`
 - 服务重启自动清理残留规则
+- 紧急防御通过动态BPF过滤器实现，不影响防火墙规则
 
 ---
 

@@ -80,6 +80,23 @@ public class ShieldProperties {
 
         /** IP 自动封禁开关（基于重复攻击检测） */
         private boolean repeatAttackBlock = true;
+
+        // ==================== 紧急防御配置 ====================
+
+        /** 紧急防御模式开关 */
+        private boolean emergencyDefense = true;
+
+        /** 触发紧急防御的唯一源IP阈值（大量不同IP攻击） */
+        private int emergencySourceIpThreshold = 5;
+
+        /** 触发紧急防御的PPS阈值 */
+        private int emergencyPpsThreshold = 50000;
+
+        /** 紧急防御时是否停止抓包（彻底停止接收） */
+        private boolean emergencyStopCapture = false;
+
+        /** 紧急防御自动恢复时间（秒），0表示不自动恢复 */
+        private int emergencyRecoverySeconds = 120;
     }
 
     @Data

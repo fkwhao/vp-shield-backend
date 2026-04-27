@@ -44,6 +44,11 @@ public class SnifferService {
 
     private Consumer<Exception> errorHandler;
 
+    private volatile String currentFilter = "ip";
+
+    @Getter
+    private volatile boolean emergencyMode = false;
+
     public List<NetworkInterface> getAvailableInterfaces() {
         List<NetworkInterface> interfaces = new ArrayList<>();
 
@@ -285,5 +290,148 @@ public class SnifferService {
 
     public boolean isCapturing() {
         return capturing.get();
+    }
+
+    // ==================== 紧急防御功能 ====================
+
+    /**
+     * 进入紧急防御模式
+     * 可以停止抓包或切换到过滤模式
+     *
+     * @param mode 模式: "stop" 停止抓包, "tcp-only" 只保留TCP, "drop-syn" 过滤SYN包
+     * @return true 成功进入紧急模式，false 失败
+     */
+    public synchronized boolean enterEmergencyMode(String mode) {
+        log.info("尝试进入紧急防御模式: {}, 抓包状态: {}", mode, capturing.get());
+
+        if (!capturing.get()) {
+            // 即使抓包未运行，也标记为紧急模式
+            emergencyMode = true;
+            log.warn("抓包未运行，但已标记紧急防御模式");
+            return true;
+        }
+
+        emergencyMode = true;
+        log.warn("!!! 进入紧急防御模式: {} !!!", mode);
+
+        switch (mode) {
+            case "stop" -> {
+                try {
+                    stopCapture();
+                    log.warn("抓包已停止，系统不再接收流量");
+                } catch (NotOpenException e) {
+                    log.error("停止抓包失败", e);
+                    return false;
+                }
+            }
+            case "tcp-only" -> {
+                // 只保留 TCP 流量，过滤掉 UDP 和 ICMP
+                updateFilter("tcp");
+                log.warn("过滤器已切换为: 只接收TCP流量");
+            }
+            case "drop-syn" -> {
+                // 过滤掉 TCP SYN 包
+                updateFilter("ip and not (tcp and tcp[tcpflags] & tcp-syn != 0)");
+                log.warn("过滤器已切换为: 过滤TCP SYN包");
+            }
+            case "drop-udp" -> {
+                updateFilter("ip and not udp");
+                log.warn("过滤器已切换为: 过滤UDP流量");
+            }
+            case "drop-icmp" -> {
+                updateFilter("ip and not icmp");
+                log.warn("过滤器已切换为: 过滤ICMP流量");
+            }
+            case "established-only" -> {
+                // 只保留已建立的TCP连接（非SYN包）
+                updateFilter("tcp and tcp[tcpflags] & tcp-syn == 0");
+                log.warn("过滤器已切换为: 只接收已建立的TCP连接");
+            }
+            default -> {
+                log.warn("未知的紧急模式: {}, 使用默认模式", mode);
+                updateFilter("tcp and tcp[tcpflags] & tcp-syn == 0");
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 退出紧急防御模式，恢复正常抓包
+     */
+    public synchronized void exitEmergencyMode() {
+        if (!emergencyMode) {
+            return;
+        }
+
+        emergencyMode = false;
+        log.info("退出紧急防御模式，恢复正常抓包");
+
+        // 恢复默认过滤器
+        if (capturing.get()) {
+            updateFilter("ip");
+        }
+    }
+
+    /**
+     * 动态更新 BPF 过滤器
+     */
+    private void updateFilter(String filter) {
+        if (pcapHandle == null || !pcapHandle.isOpen()) {
+            log.warn("抓包句柄未打开，无法更新过滤器");
+            return;
+        }
+
+        try {
+            currentFilter = filter;
+            // 使用 null netmask 时，pcap4j 会自动处理
+            // 对于某些复杂过滤器，需要指定 netmask
+            Inet4Address netmask = getNetmaskForFilter();
+            BpfProgram bpfFilter = pcapHandle.compileFilter(filter, BpfCompileMode.OPTIMIZE, netmask);
+            pcapHandle.setFilter(bpfFilter);
+            log.info("BPF过滤器已更新: {}", filter);
+        } catch (PcapNativeException | NotOpenException e) {
+            log.error("更新过滤器失败: {} - {}", filter, e.getMessage());
+            // 尝试使用简化过滤器
+            tryFallbackFilter(filter);
+        }
+    }
+
+    /**
+     * 获取用于过滤器的 netmask
+     */
+    private Inet4Address getNetmaskForFilter() {
+        try {
+            // 尝试获取当前网卡的 netmask
+            if (pcapHandle != null) {
+                // 默认使用 255.255.255.0
+                return (Inet4Address) InetAddress.getByName("255.255.255.0");
+            }
+        } catch (Exception e) {
+            log.debug("无法获取 netmask: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 过滤器失败时的备用方案
+     */
+    private void tryFallbackFilter(String originalFilter) {
+        String fallbackFilter = "ip";
+        try {
+            log.warn("尝试使用备用过滤器: {}", fallbackFilter);
+            BpfProgram bpfFilter = pcapHandle.compileFilter(fallbackFilter, BpfCompileMode.OPTIMIZE, null);
+            pcapHandle.setFilter(bpfFilter);
+            currentFilter = fallbackFilter;
+            log.info("备用过滤器已应用");
+        } catch (Exception e) {
+            log.error("备用过滤器也失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 获取当前过滤器
+     */
+    public String getCurrentFilter() {
+        return currentFilter;
     }
 }

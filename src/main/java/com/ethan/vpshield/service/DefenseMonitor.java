@@ -40,6 +40,7 @@ public class DefenseMonitor {
     private final DefenseStrategyManager strategyManager;
     private final RateLimitStrategy rateLimitStrategy;
     private final IpBlocker ipBlocker;
+    private final SnifferService snifferService;
 
     private final AtomicLong currentWindowPackets = new AtomicLong(0);
     private final AtomicLong currentWindowIcmp = new AtomicLong(0);
@@ -58,6 +59,7 @@ public class DefenseMonitor {
     private Consumer<Alert> alertHandler;
     private Consumer<TrafficStats> statsHandler;
     private ScheduledFuture<?> statsTask;
+    private ScheduledFuture<?> emergencyRecoveryTask;
     private ScheduledExecutorService scheduler;
     private volatile LocalDateTime lastAlertTime;
 
@@ -66,6 +68,12 @@ public class DefenseMonitor {
 
     @Getter
     private volatile TrafficStats currentStats = TrafficStats.empty();
+
+    @Getter
+    private volatile boolean emergencyModeActive = false;
+
+    @Getter
+    private volatile String emergencyReason = null;
 
     public void startMonitoring(Consumer<TrafficStats> statsHandler, Consumer<Alert> alertHandler) {
         this.statsHandler = statsHandler;
@@ -213,6 +221,11 @@ public class DefenseMonitor {
         int udpThreshold = properties.getDefense().getUdpThreshold();
         long cooldownMs = properties.getDefense().getAlertCooldownMs();
 
+        // 紧急防御检测
+        if (properties.getDefense().isEmergencyDefense() && !emergencyModeActive) {
+            checkEmergencyCondition(stats);
+        }
+
         boolean isSmurfAttack = stats.getIcmpReplyCount() > icmpThreshold && stats.getUniqueSourceIps() > 3;
         boolean isSynFloodAttack = stats.getTcpSynCount() > synThreshold;
         boolean isUdpFloodAttack = stats.getUdpPackets() > udpThreshold;
@@ -273,6 +286,141 @@ public class DefenseMonitor {
         triggerAlert(stats, attackType, attackDesc);
         lastAlertTime = LocalDateTime.now();
         return true;
+    }
+
+    /**
+     * 检查是否需要触发紧急防御
+     * 条件：大量不同源IP攻击 或 极高PPS
+     */
+    private void checkEmergencyCondition(TrafficStats stats) {
+        int sourceIpThreshold = properties.getDefense().getEmergencySourceIpThreshold();
+        int ppsThreshold = properties.getDefense().getEmergencyPpsThreshold();
+
+        int uniqueSourceIps = stats.getUniqueSourceIps();
+        long totalPps = stats.getTotalPackets();
+
+        // 检测伪造IP攻击：大量不同源IP
+        boolean isSpoofedIpAttack = uniqueSourceIps >= sourceIpThreshold;
+
+        // 检测极高流量攻击
+        boolean isExtremeTraffic = totalPps >= ppsThreshold;
+
+        if (isSpoofedIpAttack || isExtremeTraffic) {
+            String reason = isSpoofedIpAttack
+                    ? String.format("伪造IP攻击检测: %d 个不同源IP", uniqueSourceIps)
+                    : String.format("极高流量攻击: %d pps", totalPps);
+
+            triggerEmergencyDefense(reason, stats);
+        }
+    }
+
+    /**
+     * 触发紧急防御
+     */
+    private void triggerEmergencyDefense(String reason, TrafficStats stats) {
+        emergencyModeActive = true;
+        emergencyReason = reason;
+
+        log.error("!!! 紧急防御触发 !!! 原因: {}", reason);
+
+        // 确定防御模式
+        String mode;
+        if (properties.getDefense().isEmergencyStopCapture()) {
+            mode = "stop";
+        } else if (stats.getTcpSynCount() > properties.getDefense().getTcpSynThreshold()) {
+            mode = "drop-syn";
+        } else if (stats.getUdpPackets() > properties.getDefense().getUdpThreshold()) {
+            mode = "drop-udp";
+        } else if (stats.getIcmpPackets() > properties.getDefense().getIcmpReplyThreshold()) {
+            mode = "drop-icmp";
+        } else {
+            mode = "established-only";
+        }
+
+        snifferService.enterEmergencyMode(mode);
+
+        // 发送紧急告警
+        if (alertHandler != null) {
+            Alert emergencyAlert = Alert.builder()
+                    .alertId(UUID.randomUUID().toString())
+                    .timestamp(LocalDateTime.now())
+                    .severity(Alert.Severity.CRITICAL)
+                    .alertType(Alert.AlertType.TRAFFIC_ANOMALY)
+                    .title("紧急防御模式已激活")
+                    .description(reason + " | 防御模式: " + mode)
+                    .sourceIp("emergency")
+                    .targetIp("local")
+                    .relatedStats(stats)
+                    .build();
+            alertHandler.accept(emergencyAlert);
+        }
+
+        // 设置自动恢复
+        int recoverySeconds = properties.getDefense().getEmergencyRecoverySeconds();
+        if (recoverySeconds > 0) {
+            scheduleEmergencyRecovery(recoverySeconds);
+        }
+    }
+
+    /**
+     * 安排紧急防御自动恢复
+     */
+    private void scheduleEmergencyRecovery(int seconds) {
+        if (emergencyRecoveryTask != null) {
+            emergencyRecoveryTask.cancel(false);
+        }
+
+        emergencyRecoveryTask = scheduler.schedule(() -> {
+            if (emergencyModeActive) {
+                log.info("紧急防御自动恢复时间到达，检查流量状态...");
+                // 检查当前流量是否恢复正常
+                TrafficStats current = currentStats;
+                if (current.getTotalPackets() < properties.getDefense().getEmergencyPpsThreshold() / 2
+                        && current.getUniqueSourceIps() < properties.getDefense().getEmergencySourceIpThreshold() / 2) {
+                    exitEmergencyMode();
+                    log.info("流量已恢复正常，退出紧急防御模式");
+                } else {
+                    log.warn("流量仍然异常，延长紧急防御 {} 秒", seconds);
+                    scheduleEmergencyRecovery(seconds);
+                }
+            }
+        }, seconds, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 手动退出紧急防御模式
+     */
+    public void exitEmergencyMode() {
+        if (!emergencyModeActive) {
+            return;
+        }
+
+        emergencyModeActive = false;
+        emergencyReason = null;
+
+        snifferService.exitEmergencyMode();
+
+        if (emergencyRecoveryTask != null) {
+            emergencyRecoveryTask.cancel(false);
+            emergencyRecoveryTask = null;
+        }
+
+        log.info("紧急防御模式已退出，恢复正常运行");
+
+        // 发送恢复通知
+        if (alertHandler != null) {
+            Alert recoveryAlert = Alert.builder()
+                    .alertId(UUID.randomUUID().toString())
+                    .timestamp(LocalDateTime.now())
+                    .severity(Alert.Severity.INFO)
+                    .alertType(Alert.AlertType.TRAFFIC_ANOMALY)
+                    .title("紧急防御模式已退出")
+                    .description("系统已恢复正常流量接收")
+                    .sourceIp("system")
+                    .targetIp("local")
+                    .build();
+            alertHandler.accept(recoveryAlert);
+        }
     }
 
     private void triggerAlert(TrafficStats stats, Alert.AlertType attackType, String attackDesc) {
