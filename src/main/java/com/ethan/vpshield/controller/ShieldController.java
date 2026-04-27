@@ -1,5 +1,6 @@
 package com.ethan.vpshield.controller;
 
+import com.ethan.vpshield.config.ShieldProperties;
 import com.ethan.vpshield.dto.ApiResponse;
 import com.ethan.vpshield.dto.AttackRequest;
 import com.ethan.vpshield.dto.SystemStatus;
@@ -351,6 +352,91 @@ public class ShieldController {
     @GetMapping("/defense/strategies")
     public ApiResponse<Map<Alert.AlertType, String>> getDefenseStrategies() {
         return ApiResponse.success(strategyManager.getStrategyInfo());
+    }
+
+    // ==================== 系统配置 ====================
+
+    private final ShieldProperties shieldProperties;
+
+    /**
+     * 获取完整配置
+     * GET /api/v1/config
+     */
+    @GetMapping("/config")
+    public ApiResponse<ShieldProperties> getConfig() {
+        return ApiResponse.success(shieldProperties);
+    }
+
+    /**
+     * 更新配置（部分更新）
+     * PUT /api/v1/config
+     */
+    @PutMapping("/config")
+    public ApiResponse<String> updateConfig(@RequestBody Map<String, Object> updates) {
+        try {
+            // 更新抓包配置
+            if (updates.containsKey("capture")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> capture = (Map<String, Object>) updates.get("capture");
+                ShieldProperties.CaptureConfig captureConfig = shieldProperties.getCapture();
+                if (capture.containsKey("promiscuous")) {
+                    captureConfig.setPromiscuous((Boolean) capture.get("promiscuous"));
+                }
+                if (capture.containsKey("bufferSize")) {
+                    captureConfig.setBufferSize(((Number) capture.get("bufferSize")).intValue());
+                }
+                if (capture.containsKey("readTimeout")) {
+                    captureConfig.setReadTimeout(((Number) capture.get("readTimeout")).intValue());
+                }
+            }
+
+            // 更新防御配置
+            if (updates.containsKey("defense")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> defense = (Map<String, Object>) updates.get("defense");
+                ShieldProperties.DefenseConfig defenseConfig = shieldProperties.getDefense();
+                if (defense.containsKey("icmpReplyThreshold")) {
+                    defenseConfig.setIcmpReplyThreshold(((Number) defense.get("icmpReplyThreshold")).intValue());
+                }
+                if (defense.containsKey("tcpSynThreshold")) {
+                    defenseConfig.setTcpSynThreshold(((Number) defense.get("tcpSynThreshold")).intValue());
+                }
+                if (defense.containsKey("udpThreshold")) {
+                    defenseConfig.setUdpThreshold(((Number) defense.get("udpThreshold")).intValue());
+                }
+                if (defense.containsKey("autoBlock")) {
+                    defenseConfig.setAutoBlock((Boolean) defense.get("autoBlock"));
+                }
+                if (defense.containsKey("blockDurationMinutes")) {
+                    defenseConfig.setBlockDurationMinutes(((Number) defense.get("blockDurationMinutes")).intValue());
+                }
+                if (defense.containsKey("rateLimit")) {
+                    defenseConfig.setRateLimit((Boolean) defense.get("rateLimit"));
+                }
+                if (defense.containsKey("rateLimitRecoverySeconds")) {
+                    defenseConfig.setRateLimitRecoverySeconds(((Number) defense.get("rateLimitRecoverySeconds")).intValue());
+                }
+            }
+
+            // 更新攻击配置
+            if (updates.containsKey("attack")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> attack = (Map<String, Object>) updates.get("attack");
+                ShieldProperties.AttackConfig attackConfig = shieldProperties.getAttack();
+                if (attack.containsKey("defaultPacketCount")) {
+                    attackConfig.setDefaultPacketCount(((Number) attack.get("defaultPacketCount")).intValue());
+                }
+                if (attack.containsKey("packetIntervalMs")) {
+                    attackConfig.setPacketIntervalMs(((Number) attack.get("packetIntervalMs")).longValue());
+                }
+            }
+
+            log.info("配置已更新: {}", updates.keySet());
+            return ApiResponse.success("配置已更新");
+        } catch (Exception e) {
+            log.error("更新配置失败", e);
+            return ApiResponse.error("更新配置失败: " + e.getMessage());
+        }
     }
 
     // ==================== 系统状态 ====================
