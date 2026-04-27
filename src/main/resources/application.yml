@@ -53,7 +53,7 @@ vpshield:
     # 紧急防御模式开关
     emergency-defense: true
     # 触发紧急防御的唯一源IP阈值（大量不同IP攻击）
-    emergency-source-ip-threshold: 5
+    emergency-source-ip-threshold: 50
     # 触发紧急防御的PPS阈值
     emergency-pps-threshold: 10000
     # 紧急防御时是否停止抓包（彻底停止接收）
