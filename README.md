@@ -124,6 +124,12 @@ GET /api/v1/stats/history         历史数据
 GET /api/v1/defense/attack-sources 攻击源
 ```
 
+### 配置
+```
+GET /api/v1/config                获取完整配置
+PUT /api/v1/config                更新配置(运行时)
+```
+
 ---
 
 ## 配置参数
