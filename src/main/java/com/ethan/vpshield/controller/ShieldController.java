@@ -416,6 +416,22 @@ public class ShieldController {
                 if (defense.containsKey("rateLimitRecoverySeconds")) {
                     defenseConfig.setRateLimitRecoverySeconds(((Number) defense.get("rateLimitRecoverySeconds")).intValue());
                 }
+                // 紧急防御配置
+                if (defense.containsKey("emergencyDefense")) {
+                    defenseConfig.setEmergencyDefense((Boolean) defense.get("emergencyDefense"));
+                }
+                if (defense.containsKey("emergencySourceIpThreshold")) {
+                    defenseConfig.setEmergencySourceIpThreshold(((Number) defense.get("emergencySourceIpThreshold")).intValue());
+                }
+                if (defense.containsKey("emergencyPpsThreshold")) {
+                    defenseConfig.setEmergencyPpsThreshold(((Number) defense.get("emergencyPpsThreshold")).intValue());
+                }
+                if (defense.containsKey("emergencyRecoverySeconds")) {
+                    defenseConfig.setEmergencyRecoverySeconds(((Number) defense.get("emergencyRecoverySeconds")).intValue());
+                }
+                if (defense.containsKey("emergencyStopCapture")) {
+                    defenseConfig.setEmergencyStopCapture((Boolean) defense.get("emergencyStopCapture"));
+                }
             }
 
             // 更新攻击配置
