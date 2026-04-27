@@ -1,6 +1,11 @@
 # VP-Shield
 
-> **网络流量监控与攻击防御系统** — Spring Boot + Pcap4j
+> **网络流量监控与攻击防御系统**
+
+<img src="https://img.shields.io/badge/Spring%20Boot-3.2.5-6DB33F?style=flat-square&logo=springboot" alt="Spring Boot">
+<img src="https://img.shields.io/badge/Java-17-ED8B00?style=flat-square&logo=openjdk" alt="Java 17">
+<img src="https://img.shields.io/badge/Pcap4j-1.8.2-4479A1?style=flat-square" alt="Pcap4j">
+<img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License">
 
 实时捕获、检测、防御。支持 SYN Flood、UDP Flood、Smurf、ICMP Flood 等多种攻击类型。
 
@@ -50,9 +55,13 @@ SYN/UDP/ICMP → 各协议独立限速阈值
 
 ## 技术栈
 
-```
-Java 17 + Spring Boot 3.2.5 + Pcap4j 1.8.2 + WebSocket
-```
+<div align="center">
+
+| <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg" width="40"/> | <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg" width="40"/> | <img src="https://img.shields.io/badge/WebSocket-010101?style=for-the-badge&logo=websocket" height="30"/> |
+|:---:|:---:|:---:|
+| **Java 17** | **Spring Boot 3.2.5** | **WebSocket** |
+
+</div>
 
 ---
 
