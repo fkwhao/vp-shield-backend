@@ -1,0 +1,66 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: vp-shield
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+
+# VP-Shield 配置
+vpshield:
+  capture:
+    # 网卡名称（为空则自动选择）
+    interface-name: ""
+    # 混杂模式
+    promiscuous: true
+    # 抓包缓冲区大小
+    buffer-size: 65536
+    # 读取超时（毫秒）
+    read-timeout: 100
+
+  defense:
+    # ICMP Echo Reply 阈值（包/秒）
+    icmp-reply-threshold: 100
+    # TCP SYN 包阈值（包/秒）
+    tcp-syn-threshold: 1000
+    # UDP 包阈值（包/秒）
+    udp-threshold: 5000
+    # 统计时间窗口（毫秒）
+    stats-window-ms: 1000
+    # 告警冷却时间（毫秒）- 30秒内不重复告警
+    alert-cooldown-ms: 30000
+    # 自动封禁开关（适用于伪造 IP 攻击）
+    auto-block: false
+    # 封禁时长（分钟），0 表示永久
+    block-duration-minutes: 60
+    # 流量限速开关（适用于伪造 IP 攻击，Windows 支持有限）
+    rate-limit: true
+    # 限速恢复时间（秒）
+    rate-limit-recovery-seconds: 60
+    # IP 自动封禁：时间窗口（秒），统计该时间内的攻击次数
+    auto-block-window-seconds: 30
+    # IP 自动封禁：窗口内攻击次数阈值，超过则自动封禁
+    auto-block-attack-threshold: 3
+    # IP 自动封禁开关（基于重复攻击检测）
+    repeat-attack-block: true
+
+  attack:
+    # 默认攻击包数量
+    default-packet-count: 100
+    # 攻击包发送间隔（毫秒）
+    packet-interval-ms: 10
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.ethan.vpshield: DEBUG
+    org.pcap4j: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
