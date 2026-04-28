@@ -221,11 +221,6 @@ public class DefenseMonitor {
         int udpThreshold = properties.getDefense().getUdpThreshold();
         long cooldownMs = properties.getDefense().getAlertCooldownMs();
 
-        // 紧急防御检测
-        if (properties.getDefense().isEmergencyDefense() && !emergencyModeActive) {
-            checkEmergencyCondition(stats);
-        }
-
         boolean isSmurfAttack = stats.getIcmpReplyCount() > icmpThreshold && stats.getUniqueSourceIps() > 3;
         boolean isSynFloodAttack = stats.getTcpSynCount() > synThreshold;
         boolean isUdpFloodAttack = stats.getUdpPackets() > udpThreshold;
@@ -240,6 +235,13 @@ public class DefenseMonitor {
         if (!isAttack) {
             detectedAttackSources.clear();
             return false;
+        }
+
+        // 紧急防御检测：仅在多源IP攻击时触发，单一IP攻击优先使用IP封禁
+        int sourceIpThreshold = properties.getDefense().getEmergencySourceIpThreshold();
+        if (properties.getDefense().isEmergencyDefense() && !emergencyModeActive
+                && stats.getUniqueSourceIps() >= sourceIpThreshold) {
+            checkEmergencyCondition(stats);
         }
 
         // 确定攻击类型（需要在冷却期检查之前，用于自动封禁）
@@ -290,26 +292,16 @@ public class DefenseMonitor {
 
     /**
      * 检查是否需要触发紧急防御
-     * 条件：大量不同源IP攻击 或 极高PPS
+     * 注意：此方法仅在已检测到多源IP攻击时调用
+     * 条件：极高PPS（单一IP攻击应优先使用IP封禁，不触发紧急防御）
      */
     private void checkEmergencyCondition(TrafficStats stats) {
-        int sourceIpThreshold = properties.getDefense().getEmergencySourceIpThreshold();
         int ppsThreshold = properties.getDefense().getEmergencyPpsThreshold();
-
-        int uniqueSourceIps = stats.getUniqueSourceIps();
         long totalPps = stats.getTotalPackets();
 
-        // 检测伪造IP攻击：大量不同源IP
-        boolean isSpoofedIpAttack = uniqueSourceIps >= sourceIpThreshold;
-
-        // 检测极高流量攻击
-        boolean isExtremeTraffic = totalPps >= ppsThreshold;
-
-        if (isSpoofedIpAttack || isExtremeTraffic) {
-            String reason = isSpoofedIpAttack
-                    ? String.format("伪造IP攻击检测: %d 个不同源IP", uniqueSourceIps)
-                    : String.format("极高流量攻击: %d pps", totalPps);
-
+        // 仅检测极高流量攻击（多源IP情况已在调用方判断）
+        if (totalPps >= ppsThreshold) {
+            String reason = String.format("极高流量攻击: %d pps, %d 个源IP", totalPps, stats.getUniqueSourceIps());
             triggerEmergencyDefense(reason, stats);
         }
     }

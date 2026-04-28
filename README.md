@@ -51,9 +51,10 @@ SYN/UDP/ICMP → 各协议独立限速阈值
 防止告警风暴，避免重复处理已封禁IP
 ```
 
-**紧急防御** — 大规模DDoS攻击
+**紧急防御** — 大规模DDoS攻击（多源IP）
 ```
-检测到大量不同源IP 或 极高PPS → 动态切换BPF过滤器
+检测到多源IP攻击(≥50个) 且 极高PPS → 动态切换BPF过滤器
+单一IP攻击优先使用IP封禁，不触发紧急防御
 过滤攻击协议，只保留正常流量 → 自动/手动恢复
 ```
 
@@ -169,7 +170,7 @@ vpshield:
     auto-block-attack-threshold: 3# 封禁阈值
     # 紧急防御配置
     emergency-defense: true       # 紧急防御开关
-    emergency-source-ip-threshold: 5   # 触发阈值:源IP数量
+    emergency-source-ip-threshold: 50  # 触发阈值:源IP数量(单一IP攻击优先封禁)
     emergency-pps-threshold: 10000     # 触发阈值:PPS
     emergency-stop-capture: false      # 是否停止抓包
     emergency-recovery-seconds: 120    # 自动恢复时间
