@@ -149,8 +149,10 @@ GET /api/v1/defense/attack-sources 攻击源
 ### 配置
 ```
 GET /api/v1/config                获取完整配置
-PUT /api/v1/config                更新配置(运行时)
+PUT /api/v1/config                更新配置(运行时热更新)
 ```
+
+> **注意**: 配置热更新仅修改内存中的 `ShieldProperties` 对象，不会写入 `application.yml` 文件。服务重启后配置将恢复为 yml 中的默认值。如需持久化，请手动更新 yml 文件。
 
 ---
 

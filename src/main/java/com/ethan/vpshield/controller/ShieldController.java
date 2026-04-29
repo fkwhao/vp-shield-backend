@@ -3,6 +3,7 @@ package com.ethan.vpshield.controller;
 import com.ethan.vpshield.config.ShieldProperties;
 import com.ethan.vpshield.dto.ApiResponse;
 import com.ethan.vpshield.dto.AttackRequest;
+import com.ethan.vpshield.dto.ConfigDto;
 import com.ethan.vpshield.dto.SystemStatus;
 import com.ethan.vpshield.model.Alert;
 import com.ethan.vpshield.model.NetworkInterface;
@@ -363,8 +364,46 @@ public class ShieldController {
      * GET /api/v1/config
      */
     @GetMapping("/config")
-    public ApiResponse<ShieldProperties> getConfig() {
-        return ApiResponse.success(shieldProperties);
+    public ApiResponse<ConfigDto> getConfig() {
+        return ApiResponse.success(toConfigDto(shieldProperties));
+    }
+
+    private ConfigDto toConfigDto(ShieldProperties props) {
+        ConfigDto dto = new ConfigDto();
+
+        ConfigDto.CaptureConfig capture = new ConfigDto.CaptureConfig();
+        capture.setInterfaceName(props.getCapture().getInterfaceName());
+        capture.setPromiscuous(props.getCapture().isPromiscuous());
+        capture.setBufferSize(props.getCapture().getBufferSize());
+        capture.setReadTimeout(props.getCapture().getReadTimeout());
+        dto.setCapture(capture);
+
+        ConfigDto.DefenseConfig defense = new ConfigDto.DefenseConfig();
+        defense.setIcmpReplyThreshold(props.getDefense().getIcmpReplyThreshold());
+        defense.setTcpSynThreshold(props.getDefense().getTcpSynThreshold());
+        defense.setUdpThreshold(props.getDefense().getUdpThreshold());
+        defense.setStatsWindowMs(props.getDefense().getStatsWindowMs());
+        defense.setAlertCooldownMs(props.getDefense().getAlertCooldownMs());
+        defense.setAutoBlock(props.getDefense().isAutoBlock());
+        defense.setBlockDurationMinutes(props.getDefense().getBlockDurationMinutes());
+        defense.setRateLimit(props.getDefense().isRateLimit());
+        defense.setRateLimitRecoverySeconds(props.getDefense().getRateLimitRecoverySeconds());
+        defense.setAutoBlockWindowSeconds(props.getDefense().getAutoBlockWindowSeconds());
+        defense.setAutoBlockAttackThreshold(props.getDefense().getAutoBlockAttackThreshold());
+        defense.setRepeatAttackBlock(props.getDefense().isRepeatAttackBlock());
+        defense.setEmergencyDefense(props.getDefense().isEmergencyDefense());
+        defense.setEmergencySourceIpThreshold(props.getDefense().getEmergencySourceIpThreshold());
+        defense.setEmergencyPpsThreshold(props.getDefense().getEmergencyPpsThreshold());
+        defense.setEmergencyStopCapture(props.getDefense().isEmergencyStopCapture());
+        defense.setEmergencyRecoverySeconds(props.getDefense().getEmergencyRecoverySeconds());
+        dto.setDefense(defense);
+
+        ConfigDto.AttackConfig attack = new ConfigDto.AttackConfig();
+        attack.setDefaultPacketCount(props.getAttack().getDefaultPacketCount());
+        attack.setPacketIntervalMs(props.getAttack().getPacketIntervalMs());
+        dto.setAttack(attack);
+
+        return dto;
     }
 
     /**
