@@ -45,6 +45,13 @@ public class RateLimitStrategy implements DefenseStrategy {
         return null;
     }
 
+    /**
+     * 执行防御动作
+     *
+     * @param alert 告警信息
+     * @param stats 流量统计
+     * @return 防御结果
+     */
     @Override
     public DefenseResult execute(Alert alert, TrafficStats stats) {
         log.warn("Applying defense for attack type: {}", alert.getAlertType());
@@ -279,6 +286,11 @@ public class RateLimitStrategy implements DefenseStrategy {
         }
     }
 
+    /**
+     * 执行命令
+     *
+     * @param command 命令字符串
+     */
     private void execCommand(String command) throws IOException, InterruptedException {
         Process p = Runtime.getRuntime().exec(command);
         p.waitFor();
@@ -287,6 +299,13 @@ public class RateLimitStrategy implements DefenseStrategy {
         }
     }
 
+    /**
+     * 添加注册表项
+     *
+     * @param key 注册表键路径
+     * @param valueName 值名称
+     * @param value 值
+     */
     private void execRegAdd(String key, String valueName, String value) throws IOException, InterruptedException {
         String cmd = String.format("reg add \"%s\" /v %s /t REG_DWORD /d %s /f", key, valueName, value);
         Process p = Runtime.getRuntime().exec(cmd);
@@ -298,6 +317,9 @@ public class RateLimitStrategy implements DefenseStrategy {
         }
     }
 
+    /**
+     * 禁用限速防御
+     */
     public void disableRateLimit() {
         try {
             clearRateLimitRules();
@@ -308,6 +330,9 @@ public class RateLimitStrategy implements DefenseStrategy {
         }
     }
 
+    /**
+     * 清理限速规则
+     */
     private void clearRateLimitRules() throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
 
@@ -329,10 +354,20 @@ public class RateLimitStrategy implements DefenseStrategy {
         }
     }
 
+    /**
+     * 检查限速是否启用
+     *
+     * @return true 如果限速已启用
+     */
     public boolean isRateLimitEnabled() {
         return rateLimitEnabled;
     }
 
+    /**
+     * 检查是否有执行权限
+     *
+     * @return true 如果有管理员/root权限
+     */
     @Override
     public boolean canExecute() {
         String os = System.getProperty("os.name").toLowerCase();

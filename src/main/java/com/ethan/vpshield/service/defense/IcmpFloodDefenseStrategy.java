@@ -32,6 +32,13 @@ public class IcmpFloodDefenseStrategy implements DefenseStrategy {
         return Alert.AlertType.ICMP_FLOOD;
     }
 
+    /**
+     * 执行 ICMP Flood 攻击防御
+     *
+     * @param alert 告警信息
+     * @param stats 流量统计
+     * @return 防御结果
+     */
     @Override
     public DefenseResult execute(Alert alert, TrafficStats stats) {
         log.warn("执行 ICMP Flood 防御 - 攻击源: {}", alert.getSourceIp());
@@ -62,6 +69,11 @@ public class IcmpFloodDefenseStrategy implements DefenseStrategy {
         return DefenseResult.failure("无法识别攻击源 IP");
     }
 
+    /**
+     * 检查是否有执行权限
+     *
+     * @return true 如果有管理员/root权限
+     */
     @Override
     public boolean canExecute() {
         // 与 SmurfDefenseStrategy 相同的权限检查

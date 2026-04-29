@@ -49,6 +49,11 @@ public class SnifferService {
     @Getter
     private volatile boolean emergencyMode = false;
 
+    /**
+     * 获取可用网络接口列表
+     *
+     * @return 网络接口列表
+     */
     public List<NetworkInterface> getAvailableInterfaces() {
         List<NetworkInterface> interfaces = new ArrayList<>();
 
@@ -74,6 +79,13 @@ public class SnifferService {
         return interfaces;
     }
 
+    /**
+     * 启动抓包
+     *
+     * @param interfaceName 网卡名称，为空则自动选择
+     * @param handler 数据包处理器
+     * @param errorHandler 错误处理器
+     */
     public synchronized void startCapture(String interfaceName,
                                            Consumer<PacketInfo> handler,
                                            Consumer<Exception> errorHandler) {
@@ -139,6 +151,9 @@ public class SnifferService {
         }
     }
 
+    /**
+     * 停止抓包
+     */
     public synchronized void stopCapture() throws NotOpenException {
         if (!capturing.get()) {
             return;
@@ -162,6 +177,9 @@ public class SnifferService {
         log.info("抓包已停止");
     }
 
+    /**
+     * 抓包循环
+     */
     private void captureLoop() {
         try {
             PacketListener listener = packet -> {
@@ -186,6 +204,12 @@ public class SnifferService {
         }
     }
 
+    /**
+     * 解析数据包，提取协议信息
+     *
+     * @param packet 原始数据包
+     * @return 解析后的数据包信息，解析失败返回 null
+     */
     private PacketInfo parsePacket(Packet packet) {
         PacketInfo.PacketInfoBuilder builder = PacketInfo.builder()
                 .timestamp(LocalDateTime.now())
@@ -246,6 +270,12 @@ public class SnifferService {
         return builder.build();
     }
 
+    /**
+     * 格式化 MAC 地址
+     *
+     * @param addresses 链路层地址列表
+     * @return 格式化后的 MAC 地址字符串
+     */
     private String formatMacAddress(List<LinkLayerAddress> addresses) {
         if (addresses == null || addresses.isEmpty()) {
             return null;
@@ -259,6 +289,12 @@ public class SnifferService {
         return sb.toString();
     }
 
+    /**
+     * 提取网卡的 IPv4 地址列表
+     *
+     * @param dev 网络接口
+     * @return IPv4 地址列表
+     */
     private List<String> extractIpAddresses(PcapNetworkInterface dev) {
         List<String> ips = new ArrayList<>();
         for (PcapAddress addr : dev.getAddresses()) {
@@ -270,6 +306,9 @@ public class SnifferService {
         return ips;
     }
 
+    /**
+     * 关闭抓包句柄
+     */
     private void closeHandle() {
         if (pcapHandle != null) {
             try {
@@ -283,11 +322,19 @@ public class SnifferService {
         }
     }
 
+    /**
+     * 服务销毁时停止抓包
+     */
     @PreDestroy
     public void destroy() throws NotOpenException {
         stopCapture();
     }
 
+    /**
+     * 检查是否正在抓包
+     *
+     * @return true 如果正在抓包
+     */
     public boolean isCapturing() {
         return capturing.get();
     }

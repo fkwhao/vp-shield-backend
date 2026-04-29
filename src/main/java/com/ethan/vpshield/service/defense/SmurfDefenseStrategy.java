@@ -34,6 +34,13 @@ public class SmurfDefenseStrategy implements DefenseStrategy {
         return Alert.AlertType.SMURF_ATTACK;
     }
 
+    /**
+     * 执行 Smurf 攻击防御
+     *
+     * @param alert 告警信息
+     * @param stats 流量统计
+     * @return 防御结果
+     */
     @Override
     public DefenseResult execute(Alert alert, TrafficStats stats) {
         log.warn("执行 Smurf 攻击防御 - 攻击源: {}", alert.getSourceIp());
@@ -66,6 +73,11 @@ public class SmurfDefenseStrategy implements DefenseStrategy {
         return DefenseResult.failure("无法识别攻击源 IP");
     }
 
+    /**
+     * 检查是否有执行权限
+     *
+     * @return true 如果有管理员/root权限
+     */
     @Override
     public boolean canExecute() {
         // 检查是否有管理员权限（Windows）

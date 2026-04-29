@@ -31,6 +31,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+/**
+ * 防御监控服务
+ * 负责流量统计、攻击检测和防御响应
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -75,6 +79,12 @@ public class DefenseMonitor {
     @Getter
     private volatile String emergencyReason = null;
 
+    /**
+     * 启动防御监控
+     *
+     * @param statsHandler 流量统计处理器
+     * @param alertHandler 告警处理器
+     */
     public void startMonitoring(Consumer<TrafficStats> statsHandler, Consumer<Alert> alertHandler) {
         this.statsHandler = statsHandler;
         this.alertHandler = alertHandler;
@@ -106,6 +116,9 @@ public class DefenseMonitor {
                 properties.getDefense().getAutoBlockWindowSeconds());
     }
 
+    /**
+     * 停止防御监控
+     */
     public void stopMonitoring() {
         if (statsTask != null) {
             statsTask.cancel(false);
@@ -119,6 +132,12 @@ public class DefenseMonitor {
         log.info("Defense monitor stopped");
     }
 
+    /**
+     * 处理捕获的数据包
+     * 统计流量并追踪攻击源
+     *
+     * @param packet 数据包信息
+     */
     public void processPacket(PacketInfo packet) {
         // 过滤已被封禁的 IP，不参与统计和检测
         String sourceIp = packet.getSourceIp();
@@ -165,6 +184,9 @@ public class DefenseMonitor {
         }
     }
 
+    /**
+     * 计算流量统计并检测攻击
+     */
     private void computeStats() {
         try {
             long totalPackets = currentWindowPackets.getAndSet(0);
@@ -215,6 +237,12 @@ public class DefenseMonitor {
         }
     }
 
+    /**
+     * 检测攻击类型并触发告警
+     *
+     * @param stats 当前流量统计
+     * @return true 如果检测到攻击
+     */
     private boolean detectAttack(TrafficStats stats) {
         int icmpThreshold = properties.getDefense().getIcmpReplyThreshold();
         int synThreshold = properties.getDefense().getTcpSynThreshold();
@@ -415,6 +443,13 @@ public class DefenseMonitor {
         }
     }
 
+    /**
+     * 触发告警并执行防御动作
+     *
+     * @param stats 流量统计
+     * @param attackType 攻击类型
+     * @param attackDesc 攻击描述
+     */
     private void triggerAlert(TrafficStats stats, Alert.AlertType attackType, String attackDesc) {
         if (alertHandler == null) {
             return;
@@ -472,6 +507,12 @@ public class DefenseMonitor {
         alertHandler.accept(alert);
     }
 
+    /**
+     * 执行限速防御策略
+     *
+     * @param alert 告警信息
+     * @param stats 流量统计
+     */
     private void executeRateLimit(Alert alert, TrafficStats stats) {
         try {
             var result = rateLimitStrategy.execute(alert, stats);
@@ -485,6 +526,12 @@ public class DefenseMonitor {
         }
     }
 
+    /**
+     * 执行防御策略
+     *
+     * @param alert 告警信息
+     * @param stats 流量统计
+     */
     private void executeDefense(Alert alert, TrafficStats stats) {
         try {
             var result = strategyManager.executeDefense(alert, stats);
@@ -498,6 +545,9 @@ public class DefenseMonitor {
         }
     }
 
+    /**
+     * 重置所有计数器
+     */
     private void resetCounters() {
         currentWindowPackets.set(0);
         currentWindowIcmp.set(0);
@@ -514,6 +564,12 @@ public class DefenseMonitor {
         lastAlertTime = null;
     }
 
+    /**
+     * 获取历史流量统计
+     *
+     * @param count 获取的记录数量
+     * @return 历史流量统计列表
+     */
     public List<TrafficStats> getHistory(int count) {
         List<TrafficStats> result = new ArrayList<>();
         statsHistory.iterator().forEachRemaining(result::add);
@@ -523,15 +579,30 @@ public class DefenseMonitor {
         return result;
     }
 
+    /**
+     * 获取 ICMP 阈值
+     *
+     * @return ICMP 阈值
+     */
     public int getThreshold() {
         return properties.getDefense().getIcmpReplyThreshold();
     }
 
+    /**
+     * 更新 ICMP 阈值
+     *
+     * @param newThreshold 新阈值
+     */
     public void updateThreshold(int newThreshold) {
         properties.getDefense().setIcmpReplyThreshold(newThreshold);
         log.info("ICMP reply threshold updated to {} pps", newThreshold);
     }
 
+    /**
+     * 加载本机所有 IP 地址
+     *
+     * @return 本机 IP 地址集合
+     */
     private Set<String> loadLocalIps() {
         Set<String> ips = new HashSet<>();
         try {
@@ -550,6 +621,12 @@ public class DefenseMonitor {
         return ips;
     }
 
+    /**
+     * 检查 IP 是否为本机地址
+     *
+     * @param ip IP 地址
+     * @return true 如果是本机地址
+     */
     private boolean isLocalAddress(String ip) {
         if (ip == null || ip.isBlank()) {
             return true;
